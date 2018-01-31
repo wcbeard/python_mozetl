@@ -17,6 +17,16 @@ def load_experiments_summary(spark, parquet_path):
     )
 
 
+def add_missing_column(frame):
+    import pyspark.sql.functions as F
+    if "scalar_parent_telemetry_os_shutting_down" not in frame.columns:
+        from pyspark.sql.functions import lit
+        from pyspark.sql.types import StringType
+        return frame.withColumn("scalar_parent_telemetry_os_shutting_down", lit(None).cast(StringType()))
+    else:
+        return frame
+
+
 def to_experiment_profile_day_aggregates(frame_with_extracts):
     from mozetl.clientsdaily.fields import EXPERIMENT_FIELD_AGGREGATORS
     from mozetl.clientsdaily.fields import ACTIVITY_DATE_COLUMN
@@ -65,20 +75,32 @@ def main(date, input_bucket, input_prefix, output_bucket,
     including the activity day itself plus 5 days of lag for a total
     of 6 days).
     """
+    print("main(): spark session")
     spark = SparkSession.builder.appName("experiments_daily").getOrCreate()
+    print("main(): format spark path")
     parquet_path = format_spark_path(input_bucket, input_prefix)
+    print("main(): load experiments summary")
     frame = load_experiments_summary(spark, parquet_path)
+    print("main(): extract submission window")
     day_frame, start_date = extract_submission_window_for_activity_day(frame, date, lag_days)
+    print("main(): extract search counts")
     searches_frame = extract_search_counts(frame)
-    results = to_experiment_profile_day_aggregates(searches_frame)
+    print("main(): add missing column")
+    searches_frame_with_columns = add_missing_column(searches_frame)
+    print("main(): day aggregates")
+    results = to_experiment_profile_day_aggregates(searches_frame_with_columns)
+    print("main(): conf set")
     spark.conf.set(
         "mapreduce.fileoutputcommitter.marksuccessfuljobs", "false"
     )  # Don't write _SUCCESS files, which interfere w/ReDash discovery
+    print("main(): output base path")
     output_base_path = "{}/v{}/activity_date_s3={}".format(
         format_spark_path(output_bucket, output_prefix),
         output_version,
         start_date.strftime('%Y-%m-%d'))
+    print("main(): write")
     results.write.mode("overwrite").parquet(output_base_path)
+    print("success")
 
 
 if __name__ == '__main__':
