@@ -12,7 +12,7 @@
 # MOZETL_GIT_PATH:          (optional) path to the repository
 # MOZETL_GIT_BRANCH:        (optional) git branch to use
 # MOZETL_SPARK_MASTER:      (optional) spark-submit --master (defaults to yarn)
-# MOZETL_SUBMISSION_METHOD: (optional) specify either spark or python 
+# MOZETL_SUBMISSION_METHOD: (optional) specify either spark or python
 #                                      (defaults to spark)
 #
 # Flags for running this script in development, always has precedence
@@ -28,6 +28,21 @@
 
 # bash "strict" mode
 set -euo pipefail
+
+if conda env list | grep -q py3; then
+    conda env remove -yn py3
+fi
+conda env create -f /home/hadoop/analyses/bgbb/environment3.yml
+PYSPARK_PYTHON='/mnt/anaconda2/envs/py3/bin/python'
+
+# otherwise ignores intended pyspark
+#/home/hadoop/pyinstall/:/usr/lib/spark/python/:/usr/lib/spark/jars/telemetry-spark-packages-assembly.jar
+unset PYTHONPATH
+
+# https://github.com/conda/conda/issues/3199
+set +u
+source activate py3
+set -u
 
 is_dev='false'
 is_verbose='true'
@@ -84,6 +99,9 @@ fi
 
 pip install .
 python setup.py bdist_egg
+
+# echo $PYTHONPATH
+python -c "import pyspark; from pyspark.sql.functions import pandas_udf, PandasUDFType;  print(pyspark.__version__)"
 
 if [[ "${MOZETL_SUBMISSION_METHOD}" = "spark" ]]; then
     spark-submit --master ${MOZETL_SPARK_MASTER} \

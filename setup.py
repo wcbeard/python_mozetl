@@ -26,10 +26,11 @@ setup(
     include_package_data=True,
     install_requires=[
         'arrow==0.10.0',
+        'bgbb==0.1.2',
         'click==6.7',
         'click_datetime==0.2',
         'numpy==1.13.3',
-        'pyspark==2.3.1',
+        'pyspark==2.4.0',
         'pyspark_hyperloglog==2.1.1',
         'python_moztelemetry==0.10.2',
         'requests-toolbelt==0.8.0',
